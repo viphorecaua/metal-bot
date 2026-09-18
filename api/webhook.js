@@ -100,11 +100,11 @@ bot.on('text', async (ctx) => {
 });
 
 // Общая функция обработки фото / PDF
-async function handleInvoiceFile(ctx, fileId, fileTypeDesc) {
+async function handleInvoiceFile(ctx, fileId, fileTypeDesc, fileType = 'JPG') {
   await ctx.reply(`⏳ Распознаю ${fileTypeDesc} через OCR…`);
   try {
     const link = await ctx.telegram.getFileLink(fileId);
-    const text = await recognizeImageText(link.href);
+    const text = await recognizeImageText(link.href, fileType);
     const { items, unparsed, supplier } = parseInvoiceText(text);
 
     if (items.length > 0) {
@@ -129,19 +129,24 @@ async function handleInvoiceFile(ctx, fileId, fileTypeDesc) {
 bot.on('photo', async (ctx) => {
   const photos = ctx.message.photo;
   const fileId = photos[photos.length - 1].file_id;
-  await handleInvoiceFile(ctx, fileId, 'фото накладной');
+  await handleInvoiceFile(ctx, fileId, 'фото накладной', 'JPG');
 });
 
 // Обработка документов (PDF или несжатые изображения)
 bot.on('document', async (ctx) => {
   const doc = ctx.message.document;
-  const isPdf = doc.mime_type === 'application/pdf' || (doc.file_name && doc.file_name.toLowerCase().endsWith('.pdf'));
-  const isImg = doc.mime_type && doc.mime_type.startsWith('image/');
+  const fileName = (doc.file_name || '').toLowerCase();
+  const mime = doc.mime_type || '';
+  const isPdf = mime === 'application/pdf' || fileName.endsWith('.pdf');
+  const isImg = mime.startsWith('image/') || /\.(jpe?g|png|webp|bmp|tif|tiff)$/i.test(fileName);
 
   if (isPdf || isImg) {
-    await handleInvoiceFile(ctx, doc.file_id, isPdf ? 'PDF-накладную' : 'документ');
+    let fileType = 'JPG';
+    if (isPdf) fileType = 'PDF';
+    else if (mime === 'image/png' || fileName.endsWith('.png')) fileType = 'PNG';
+    await handleInvoiceFile(ctx, doc.file_id, isPdf ? 'PDF-накладную' : 'документ', fileType);
   } else {
-    ctx.reply('Пожалуйста, отправьте накладную как фото или файл в формате PDF.');
+    ctx.reply('Пожалуйста, отправьте накладную как фото или файл в формате PDF/JPG/PNG.');
   }
 });
 
