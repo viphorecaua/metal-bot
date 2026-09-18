@@ -165,20 +165,24 @@ bot.action('start_analysis', async (ctx) => {
   await ctx.answerCbQuery('Анализирую предложения…');
   const items = await store.getItems(ctx.chat.id);
 
-  if (items.length < 2) {
-    return ctx.reply('⚠️ В буфере меньше двух предложений. Добавьте ещё варианты от поставщиков для сравнения.');
+  if (!items || items.length === 0) {
+    return ctx.reply('⚠️ В буфере пусто. Отправьте накладную (фото/PDF) или сообщение с ценами.');
   }
 
   const normalized = items.map(normalizeItem).filter(Boolean);
   const skipped = items.length - normalized.length;
 
-  if (normalized.length < 2) {
-    return ctx.reply('⚠️ Не хватило данных для расчёта цен за кг (не удалось вычислить вес для большинства позиций).');
+  if (normalized.length === 0) {
+    return ctx.reply('⚠️ Не хватило данных для расчёта (не удалось распознать металлопрокат ни в одной позиции).');
   }
 
   const groups = groupAndCompare(normalized);
+  const uniqueSuppliers = new Set(normalized.map((i) => i.supplier));
+  const isComparing = uniqueSuppliers.size > 1;
 
-  let msg = '📊 РЕЗУЛЬТАТЫ СРАВНЕНИЯ ЦЕН:\n\n';
+  let msg = isComparing
+    ? '📊 РЕЗУЛЬТАТЫ СРАВНЕНИЯ ЦЕН:\n\n'
+    : '📊 РАСЧЁТ ЦЕН И ВЕСА МЕТАЛЛОПРОКАТА:\n\n';
 
   for (const group of groups) {
     const isSheet = group.unit === 'м²';
